@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author liangyehao
@@ -30,7 +31,16 @@ public class RedisController {
         // 1.加锁
         String lockKey = "lockKey";
         try {
-            Boolean absent = Objects.requireNonNull(redisTemplate.opsForValue().setIfAbsent(lockKey, "liang"));
+//            Boolean absent = Objects.requireNonNull(redisTemplate.opsForValue().setIfAbsent(lockKey, "liang"));
+//            // 设置10秒钟过期,防止jvm宕机造成的死锁   //在此刻可能会宕机,同样会造成死锁
+//            redisTemplate.expire(lockKey,10, TimeUnit.SECONDS);
+
+
+            // redis底层保证了存值和设置超时时间的原子性
+            Boolean absent = Objects.requireNonNull(
+                    redisTemplate.opsForValue().setIfAbsent(lockKey, "liang",10,TimeUnit.SECONDS)
+            );
+
             // 2.锁存在,直接返回,不执行减库存
             if (!absent) {
                 System.out.println("无法获取资源,请重试...");
