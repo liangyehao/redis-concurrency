@@ -1,5 +1,7 @@
 package com.liang.controller;
 
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 public class RedisController {
 
     @Autowired
+    Redisson redisson;
+
+    @Autowired
     RedisTemplate<String,String> redisTemplate;
 
     /**
@@ -29,26 +34,14 @@ public class RedisController {
     @GetMapping("/jkc")
     public String test(){
 
-        // 1.加锁
+
         String lockKey = "lockKey";
-        String clientId = UUID.randomUUID().toString();
+        // 1.获取锁对象
+        RLock redissonLock = redisson.getLock(lockKey);
+
         try {
-//            Boolean absent = Objects.requireNonNull(redisTemplate.opsForValue().setIfAbsent(lockKey, "liang"));
-//            // 设置10秒钟过期,防止jvm宕机造成的死锁   //在此刻可能会宕机,同样会造成死锁
-//            redisTemplate.expire(lockKey,10, TimeUnit.SECONDS);
-
-
-            // redis底层保证了存值和设置超时时间的原子性
-            Boolean absent = Objects.requireNonNull(
-                    redisTemplate.opsForValue().setIfAbsent(lockKey, clientId,10,TimeUnit.SECONDS)
-            );
-
-            // 2.锁存在,直接返回,不执行减库存
-            if (!absent) {
-                System.out.println("无法获取资源,请重试...");
-                return "error";
-            }
-            // 3.加锁成功,扣减库存
+            // 2.加锁 .setIfAbsent(lockKey, clientId,30,TimeUnit.SECONDS)
+            redissonLock.lock();
             int stock = Integer.parseInt(Objects.requireNonNull(redisTemplate.opsForValue().get("stock")));
             if (stock>0) {
                 int realStock = stock - 1;
@@ -58,11 +51,8 @@ public class RedisController {
                 System.out.println("扣减失败,库存不足.");
             }
         } finally {
-            //判断这个锁是否是自己加的,只能释放自己加的锁
-            if (clientId.equals(redisTemplate.opsForValue().get(lockKey))) {
-                // 4.库存扣减完成,释放锁
-                redisTemplate.delete(lockKey);
-            }
+            // 3.释放锁
+            redissonLock.unlock();
         }
 
 
