@@ -22,14 +22,17 @@ public class RedisController {
 
     @GetMapping("/jkc")
     public String test(){
-        int stock = Integer.parseInt(Objects.requireNonNull(redisTemplate.opsForValue().get("stock")));
-        if (stock>0) {
-            int realStock = stock - 1;
-            redisTemplate.opsForValue().set("stock", String.valueOf(stock));
-            System.out.println("扣减成功,剩余库存: " + realStock);
 
-        }else{
-            System.out.println("扣减失败,库存不足.");
+        synchronized (this){
+            int stock = Integer.parseInt(Objects.requireNonNull(redisTemplate.opsForValue().get("stock")));
+            if (stock>0) {
+                int realStock = stock - 1;
+                redisTemplate.opsForValue().set("stock", String.valueOf(realStock));
+                System.out.println("扣减成功,剩余库存: " + realStock);
+
+            }else{
+                System.out.println("扣减失败,库存不足.");
+            }
         }
         return "end";
     }
